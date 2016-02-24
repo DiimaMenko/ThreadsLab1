@@ -16,7 +16,6 @@ void CalculateIntegral::calculatePart(double start, double end, double eps){
     QTime *endTime = new QTime(QTime::currentTime());
     this->calculatoionTime = new QTime();
     this->calculatoionTime->setHMS(0, 0, 0, endTime->msec() - startTime->msec());
-    qDebug() << QObject::thread();
 }
 
 double CalculateIntegral::getResult(){

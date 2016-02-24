@@ -14,12 +14,10 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         mymainwindow.cpp \
-    calculateintegral.cpp \
     resultwidget.cpp \
     mythread.cpp
 
 HEADERS  += mymainwindow.h \
-    calculateintegral.h \
     resultwidget.h \
     mythread.h
 

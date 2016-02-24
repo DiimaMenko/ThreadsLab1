@@ -10,6 +10,11 @@ MyMainWindow::MyMainWindow(QWidget *parent) :
     this->numberOfFinishedThreads = 0;
     this->numberOfThreads = 0;
 
+    this->a = 3;//start of interval for integration = 3
+    this->b = 5;//end of interval for integration   = 5
+    this->eps1 = 0.00001;//step  = 0.001
+    this->resultParallel = 0;
+
     this->threadLabel = new QLabel(this);
     this->threadLabel->move(20, 20);
     this->threadLabel->resize(300, 40);
@@ -34,11 +39,22 @@ MyMainWindow::MyMainWindow(QWidget *parent) :
     this->startSerialCalculationButton->show();
     connect(this->startSerialCalculationButton,SIGNAL(clicked(bool)), this, SLOT(startSerialCalculation()));
 
-    this->a = 0;//start of interval for integration = 3
-    this->b = 10;//end of interval for integration   = 5
-    this->eps1 = 0.000000001;//step  = 0.0000001
-    this->eps2 = 0.0001;//step2 = 0.0001
-    this->resultParallel = 0;
+    this->realResultLabel = new QLabel("Real result = ", this);
+    this->realResultLabel->move(260, 20);
+    this->realResultLabel->resize(200, 40);
+    this->realResultLabel->show();
+
+    this->realResult = new QLabel(this);
+    this->realResult->move(330, 20);
+    this->realResult->resize(200,40);
+    double result = antiderivative(this->b) - antiderivative(this->a);
+    this->realResult->setText(QString::number(result));
+    this->realResult->show();
+}
+
+double MyMainWindow::antiderivative(double x){
+    double res = 1.0 / 7.0 * sqrt(pow(pow(x, 2) + 4.0, 5)) * (pow(x, 2) - 8.0 / 5.0);
+    return res;
 }
 
 MyMainWindow::~MyMainWindow()
@@ -75,54 +91,39 @@ bool MyMainWindow::checkIfEnteredNumberOfThreads(){
 }
 
 void MyMainWindow::startParallelCalculation(){
-//    qDebug() << "started parallel calculation";
-//    qDebug() << this->numberOfThreads;
-//    qDebug() << this->numberOfFinishedThreads;
+    for(int i = 0; i < this->numberOfThreads; i++){
+        MyThread *tempThread = new MyThread((this->b - this->a) / this->numberOfThreads * i + this->a, (this->b - this->a) / this->numberOfThreads * (i + 1) + this->a, this->eps1);
+        myThreads.push_back(tempThread);
+    }
     this->timeOfParallelCalculationsStart = QTime::currentTime();
     for(int i = 0; i < this->numberOfThreads; i++){
-        MyThread *tempThread = new MyThread;
-        this->myThreads.push_back(tempThread);
-        this->myThreads[i]->start();
-        myThreads[i]->setPriority(QThread::NormalPriority);
-        CalculateIntegral *somePart = new CalculateIntegral;
-        somePart->moveToThread(myThreads[i]);
-        somePart->calculatePart((this->b - this->a) / this->numberOfThreads * i + this->a, (this->b - this->a) / this->numberOfThreads * (i + 1) + this->a, this->eps1);
-        this->calculators.push_back(somePart);
-        connect(myThreads[i], SIGNAL(finished()), this, SLOT(threadFinishedCalculation()));
+        myThreads[i]->start();
     }
-}
+    for(int i = 0; i < this->numberOfThreads; i++){
+        myThreads[i]->wait();
+    }
+    this->timeOfParallelCalculations = QTime::currentTime().msecsSinceStartOfDay() - this->timeOfParallelCalculationsStart.msecsSinceStartOfDay();
 
-void MyMainWindow::threadFinishedCalculation(){
-    this->numberOfFinishedThreads++;
-    qDebug() << "finished";
-    qDebug() << this->numberOfFinishedThreads;
-    int currentThread = 0;
     for(int i= 0; i < this->numberOfThreads; i++){
-
-        if(QObject::sender() == this->myThreads[i]){
-            currentThread = i;
-            break;
-        }
+        this->resultParallel += myThreads[i]->getResult();
     }
-    this->resultParallel = this->resultParallel + this->calculators[currentThread]->getResult();
-    if(this->numberOfFinishedThreads == this->numberOfThreads){
-        this->timeOfParallelCalculations = QTime::currentTime().msecsSinceStartOfDay() - this->timeOfParallelCalculationsStart.msecsSinceStartOfDay();
-        this->parallelResultWidget = new ResultWidget(this->numberOfThreads, this->timeOfParallelCalculations, this->resultParallel, this->eps1);
-        this->parallelResultWidget->resize(500,300);
-        this->parallelResultWidget->setWindowTitle("Parallel Calculation Result");
-        this->parallelResultWidget->show();
-    }
+    this->parallelResultWidget = new ResultWidget(this->numberOfThreads, this->timeOfParallelCalculations, this->resultParallel, this->eps1);
+    this->parallelResultWidget->resize(500, 300);
+    this->parallelResultWidget->setWindowTitle("Parallel Calculation Result");
+    this->parallelResultWidget->show();
 }
 
 void MyMainWindow::startSerialCalculation(){
-    CalculateIntegral *serial = new CalculateIntegral();
+    MyThread *tempThread = new MyThread(this->a, this->b, eps1);
     this->timeOfSerialCalculationsStart = QTime::currentTime();
-    serial->calculatePart(this->a, this->b, eps1);
+    tempThread->start();
+    tempThread->wait();
     this->timeOfSerialCalculations = QTime::currentTime().msecsSinceStartOfDay() - this->timeOfSerialCalculationsStart.msecsSinceStartOfDay();
-    this->resultSerial = serial->getResult();
+    this->resultSerial = tempThread->getResult();
     this->serialResultWidget = new ResultWidget(1, this->timeOfSerialCalculations, this->resultSerial, this->eps1);
     this->serialResultWidget->resize(500,300);
     this->serialResultWidget->setWindowTitle("Serial Calculation Result");
     this->serialResultWidget->show();
+    tempThread->deleteLater();
 }
 
